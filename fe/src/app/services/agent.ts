@@ -1,0 +1,195 @@
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import commonStore from "app/stores/commonStore";
+import authStore from "app/stores/authStore";
+import { IUser } from "app/models/User.model";
+import { IArticle } from "app/models/Article.model";
+import IComment from "app/models/Comment.model";
+// import { configure, getLogger } from 'log4js';
+
+// configure({
+//     appenders: { console: { type: 'console' } },
+//     categories: { default: { appenders: ['console'], level: 'info' } }
+// });
+// const logger = getLogger();
+
+const API_ROOT =
+  window.location.search.indexOf("debug") > -1
+    ? "http://localhost:3000/api"
+    : "https://fk3bqhh8j6.execute-api.us-east-1.amazonaws.com/prod/api";
+
+const responseBody = (res: AxiosResponse) => res.data;
+const encode = encodeURIComponent;
+
+axios.interceptors.request.use(
+  (config: AxiosRequestConfig) => {
+    // Append token
+    if (commonStore.token) {
+      config.headers.authorization = `Token ${commonStore.token}`;
+    }
+    return config;
+  },
+  (error: any) => {
+    // logger.error('Request error', error);
+    return Promise.reject(error);
+  }
+);
+
+axios.interceptors.response.use(
+  (response: AxiosResponse) => {
+    return response;
+  },
+  (error: AxiosError) => {
+    if (error.response) {
+      if (error.response.status === 401) {
+        authStore.logout();
+      }
+
+      return Promise.reject(error.response);
+    } else if (error.request) {
+      // // logger.error(
+      //     'The request was made but no response was received',
+      //     error.request
+      // );
+    } else {
+      // logger.error(
+      //     'Something happened in setting up the request that triggered an Error'
+      // );
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+const requests = {
+  del: (url: string) => axios.delete(`${API_ROOT}${url}`).then(responseBody),
+  get: (url: string) => axios.get(`${API_ROOT}${url}`).then(responseBody),
+  post: (url: string, data?: any) =>
+    axios.post(`${API_ROOT}${url}`, data).then(responseBody),
+  put: (url: string, data?: any) =>
+    axios.put(`${API_ROOT}${url}`, data).then(responseBody)
+};
+
+interface IUserResponse {
+  user: IUser;
+}
+
+const Auth = {
+  current: () => requests.get("/user") as Promise<IUserResponse>,
+  login: (email: string, password: string) =>
+    requests.post("/users/login", { user: { email, password } }) as Promise<
+      IUserResponse
+    >,
+  register: (username: string, email: string, password: string) =>
+    requests.post("/users", {
+      user: { username, email, password }
+    }) as Promise<IUserResponse>,
+  save: (user: IUser) =>
+    requests.put("/user", { user }) as Promise<IUserResponse>
+};
+
+const Tags = {
+  getAll: () => requests.get("/tags") as Promise<{ tags: string[] }>
+};
+
+const limit = (count: number, p: number) =>
+  `limit=${count}&offset=${p ? p * count : 0}`;
+const omitSlug = (article: IArticle) =>
+  Object.assign({}, article, { slug: undefined });
+
+interface ISingleArticleResponse {
+  article: IArticle;
+}
+
+interface IMultipleArticlesResponse {
+  articles: IArticle[];
+  articlesCount: number;
+}
+const Articles = {
+  all: (page: number, lim = 10) =>
+    requests.get(`/articles?${limit(lim, page)}`) as Promise<
+      IMultipleArticlesResponse
+    >,
+  byAuthor: (author: string, page: number, lim = 10) =>
+    requests.get(
+      `/articles?author=${encode(author)}&${limit(lim, page)}`
+    ) as Promise<IMultipleArticlesResponse>,
+  byTag: (tag: string, page: number, lim = 10) =>
+    requests.get(`/articles?tag=${encode(tag)}&${limit(lim, page)}`) as Promise<
+      IMultipleArticlesResponse
+    >,
+  create: (article: IArticle) =>
+    requests.post("/articles", { article }) as Promise<ISingleArticleResponse>,
+  del: (slug: string) => requests.del(`/articles/${slug}`),
+  favorite: (slug: string) =>
+    requests.post(`/articles/${slug}/favorite`) as Promise<
+      ISingleArticleResponse
+    >,
+  favoritedBy: (author: string, page: number, lim = 10) =>
+    requests.get(
+      `/articles?favorited=${encode(author)}&${limit(lim, page)}`
+    ) as Promise<IMultipleArticlesResponse>,
+  feed: (page: number, lim = 10) =>
+    requests.get(`/articles/feed?${limit(lim, page)}`) as Promise<
+      IMultipleArticlesResponse
+    >,
+  get: (slug: string) =>
+    requests.get(`/articles/${slug}`) as Promise<ISingleArticleResponse>,
+  unfavorite: (slug: string) =>
+    requests.del(`/articles/${slug}/favorite`) as Promise<
+      ISingleArticleResponse
+    >,
+  update: (article: IArticle) =>
+    requests.put(`/articles/${article.slug}`, {
+      article: omitSlug(article)
+    }) as Promise<ISingleArticleResponse>
+};
+
+interface ISingleCommentResponse {
+  comment: IComment;
+}
+
+interface IMultipleCommentsResponse {
+  comments: IComment[];
+}
+
+const Comments = {
+  create: (slug: string, comment: string) =>
+    requests.post(`/articles/${slug}/comments`, { comment }) as Promise<
+      ISingleCommentResponse
+    >,
+  delete: (slug: string, commentId: string) =>
+    requests.del(`/articles/${slug}/comments/${commentId}`) as Promise<
+      ISingleCommentResponse
+    >,
+  forArticle: (slug: string) =>
+    requests.get(`/articles/${slug}/comments`) as Promise<
+      IMultipleCommentsResponse
+    >
+};
+
+interface IProfile {
+  username: string;
+  bio: string;
+  image: string;
+  following: boolean;
+}
+
+interface IProfileResponse {
+  profile: IProfile;
+}
+const Profile = {
+  follow: (username: string) =>
+    requests.post(`/profiles/${username}/follow`) as Promise<IProfileResponse>,
+  get: (username: string) =>
+    requests.get(`/profiles/${username}`) as Promise<IProfileResponse>,
+  unfollow: (username: string) =>
+    requests.del(`/profiles/${username}/follow`) as Promise<IProfileResponse>
+};
+
+export default {
+  Articles,
+  Auth,
+  Comments,
+  Profile,
+  Tags
+};
