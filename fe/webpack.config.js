@@ -10,6 +10,21 @@ var outPath = path.join(__dirname, "./build");
 // plugins
 var HtmlWebpackPlugin = require("html-webpack-plugin");
 var WebpackCleanupPlugin = require("webpack-cleanup-plugin");
+var BundleAnalyzerPlugin = require("webpack-bundle-analyzer")
+  .BundleAnalyzerPlugin;
+
+var plugins = [
+  new webpack.EnvironmentPlugin({
+    NODE_ENV: "development", // use 'development' unless process.env.NODE_ENV is defined
+    DEBUG: false
+  }),
+  new WebpackCleanupPlugin(),
+  new HtmlWebpackPlugin({
+    template: "assets/index.html"
+  })
+];
+
+if (isProduction) plugins.push(new BundleAnalyzerPlugin());
 
 module.exports = {
   context: sourcePath,
@@ -58,6 +73,7 @@ module.exports = {
   },
   optimization: {
     splitChunks: {
+      chunks: "async",
       name: true,
       cacheGroups: {
         commons: {
@@ -68,6 +84,13 @@ module.exports = {
           test: /[\\/]node_modules[\\/]/,
           chunks: "all",
           priority: -10,
+          // minSize: 0,
+          // maxSize: 243000, // in bytes
+          minChunks: 1,
+          maxAsyncRequests: 5,
+          maxInitialRequests: 3,
+          automaticNameDelimiter: ".",
+          automaticNameMaxLength: 30,
           filename: isProduction
             ? "vendor.[contenthash].js"
             : "vendor.[hash].js"
@@ -76,16 +99,7 @@ module.exports = {
     },
     runtimeChunk: true
   },
-  plugins: [
-    new webpack.EnvironmentPlugin({
-      NODE_ENV: "development", // use 'development' unless process.env.NODE_ENV is defined
-      DEBUG: false
-    }),
-    new WebpackCleanupPlugin(),
-    new HtmlWebpackPlugin({
-      template: "assets/index.html"
-    })
-  ],
+  plugins: plugins,
   devServer: {
     contentBase: sourcePath,
     inline: true,

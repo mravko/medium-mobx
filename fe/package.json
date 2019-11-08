@@ -7,6 +7,7 @@
     "test": "jest",
     "dev": "webpack-dev-server --mode development --progress --colors --port 3000 --open",
     "prod": "webpack-dev-server --mode production --progress --colors --port 3000 --open",
+    "analyze": "webpack -p --progress --colors",
     "build": "webpack -p --progress --colors",
     "prettier": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
@@ -57,6 +58,7 @@
     "typescript": "^3.6.3",
     "url-loader": "^2.1.0",
     "webpack": "^4.41.0",
+    "webpack-bundle-analyzer": "^3.6.0",
     "webpack-cleanup-plugin": "^0.5.1",
     "webpack-cli": "^3.3.9",
     "webpack-dev-server": "^3.8.1",
